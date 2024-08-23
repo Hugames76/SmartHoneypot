@@ -1,0 +1,4 @@
+# Ignore virtual environment
+Honeypot/.venv/
+# Ignore python cache
+__pycache__/
