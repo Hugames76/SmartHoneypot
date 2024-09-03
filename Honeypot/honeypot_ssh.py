@@ -1,40 +1,50 @@
-import socket ,logging, signal, sys
+import socket
+import logging
 
-# Configurer les logs pour capturer les tentatives d'intrusion
-logging.basicConfig(filename='honeypot.log', level=logging.INFO, 
+# Configurer les logs
+logging.basicConfig(filename='..\\DATA\\honeypot.log', level=logging.INFO, 
                     format='%(asctime)s - %(message)s')
-
 
 def start_honeypot(host='0.0.0.0', port=2222):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((host, port))
-    server_socket.listen(5)  # Le serveur écoute jusqu'à 5 connexions simultanées
-    print(f"Honeypot démarré sur {host}:{port}")
+    server_socket.listen(5)  # Écoute des connexions simultanées
+    print(f"Honeypot SSH démarré sur {host}:{port}")
 
-    def signal_handler(sig, frame):
-        print('Arrêt du honeypot...')
-        server_socket.close()
-        sys.exit(0)
+    fake_files = ['file1.txt', 'file2.log', 'report.pdf']
+    current_dir = '/home/user/'
 
-    signal.signal(signal.SIGINT, signal_handler)
-    
     while True:
-        try:
-            client_socket, client_address = server_socket.accept()
-            logging.info(f"Nouvelle connexion de {client_address}")
+        client_socket, client_address = server_socket.accept()
+        logging.info(f"Nouvelle connexion SSH de {client_address}")
+        client_socket.send(b"Bienvenue sur SSH honeypot!\n")
+        client_socket.send(f"{current_dir}$ ".encode())
 
-            # Simuler un faux prompt SSH
-            client_socket.send(b"Bienvenue sur SSH honeypot!\n")
-            while True:
-                try:
-                    data = client_socket.recv(1024)  # Recevoir des données de l'attaquant
-                    if not data:
-                        break
-                    logging.info(f"Commande reçue de {client_address}: {data.decode().strip()}")
-                    client_socket.send(b"Commande non reconnue.\n")  # Répondre avec un message par défaut
-                except ConnectionResetError:
+        while True:
+            try:
+                data = client_socket.recv(1024).decode().strip()
+                if not data:
                     break
 
-            client_socket.close()
-        except OSError:
-            break
+                logging.info(f"Commande reçue SSH de {client_address}: {data}")
+
+                # Simulation des commandes shell
+                if data == 'ls':
+                    response = '\n'.join(fake_files) + '\n'
+                elif data == 'pwd':
+                    response = current_dir + '\n'
+                elif data.startswith('cd '):
+                    new_dir = data.split(' ')[1]
+                    current_dir += new_dir + '/'
+                    response = ''
+                elif data.startswith('exit'):
+                    break
+                else:
+                    response = f"Commande '{data}' non reconnue.\n"
+
+                client_socket.send(response.encode())
+                client_socket.send(f"{current_dir}$ ".encode())
+            except ConnectionResetError:
+                break
+
+        client_socket.close()
